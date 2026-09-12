@@ -1177,6 +1177,67 @@
     }
   }
 
-  console.log("✅ Admin JS loaded (Part 2 + Actions)");
+    // ============================================================
+  //  13) ربط الأزرار (Event Bindings)
+  // ============================================================
+
+  // ---------- أزرار الجدول (Event Delegation) ----------
+  devicesTableBody.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-action");
+    const token = btn.getAttribute("data-token");
+    if (!token) return;
+
+    switch (action) {
+      case "logs":
+        openLogsModal(token);
+        break;
+
+      case "edit":
+        openEditModal(token);
+        break;
+
+      case "revoke":
+        toggleRevoke(token, false);
+        break;
+
+      case "unrevoke":
+        toggleRevoke(token, true);
+        break;
+
+      case "delete":
+        confirmDelete(token);
+        break;
+    }
+  });
+
+  // ---------- أزرار شريط الأدوات ----------
+  $("newDeviceBtn").addEventListener("click", openNewDeviceModal);
+
+  // ---------- أزرار Modal: توليد جهاز ----------
+  $("createDeviceConfirm").addEventListener("click", createDevice);
+
+  // ---------- أزرار Modal: تعديل جهاز ----------
+  $("saveEditBtn").addEventListener("click", saveEdit);
+
+  // ---------- أزرار Modal: تأكيد الحذف ----------
+  $("confirmYesBtn").addEventListener("click", performDelete);
+
+  // ============================================================
+  //  14) اختصارات لوحة المفاتيح (تجربة أفضل)
+  // ============================================================
+  document.addEventListener("keydown", (e) => {
+    // Escape → إغلاق كل النوافذ المنبثقة
+    if (e.key === "Escape") {
+      document.querySelectorAll(".modal-overlay.active").forEach((m) => {
+        m.classList.remove("active");
+      });
+    }
+  });
+
+  console.log("✅ Admin JS loaded — FULLY FUNCTIONAL");
+</script>
 </script>
 </script>
