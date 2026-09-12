@@ -2,12 +2,16 @@
 require("dotenv").config();
 
 const express = require("express");
+const path = require("path");
 const { initDb } = require("./db");
 const askRouter = require("./routes/ask");
 const adminRouter = require("./routes/admin");
 
 const app = express();
 app.use(express.json({ limit: "50kb" }));
+
+// ✅ خدمة الملفات الثابتة من مجلد public/ (لوحة الإدارة، صفحات، صور)
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
