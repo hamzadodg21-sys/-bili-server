@@ -928,5 +928,255 @@
     showLogin();
   })();
 
-  console.log("✅ Admin JS loaded (Part 2)");
+   // ============================================================
+  //  12) دوال الإجراءات (Actions)
+  // ============================================================
+
+  // ---------- نسخ للحافظة ----------
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("📋 تم النسخ", "success");
+    } catch (_) {
+      // Fallback للبيئات القديمة
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+      showToast("📋 تم النسخ", "success");
+    }
+  }
+
+  // ---------- 1) توليد رمز جديد ----------
+  function openNewDeviceModal() {
+    $("newLabel").value = "";
+    $("newLimit").value = 1000;
+    $("newDeviceModal").classList.add("active");
+  }
+
+  async function createDevice() {
+    const label = $("newLabel").value.trim();
+    const monthlyLimit = parseInt($("newLimit").value, 10);
+
+    if (!monthlyLimit || monthlyLimit < 1) {
+      showToast("الحد الشهري يجب أن يكون رقماً أكبر من 0", "warning");
+      return;
+    }
+
+    const btn = $("createDeviceConfirm");
+    btn.disabled = true;
+    btn.textContent = "جاري الإنشاء...";
+
+    try {
+      const data = await apiCall("/admin/devices", {
+        method: "POST",
+        body: JSON.stringify({ label, monthlyLimit }),
+      });
+
+      $("newDeviceModal").classList.remove("active");
+
+      // نعرض الرمز في Toast طويل مع زر نسخ
+      showTokenToast(data.token);
+
+      showToast("✅ تم توليد الرمز بنجاح", "success");
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message || "فشل الإنشاء", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "إنشاء";
+    }
+  }
+
+  // Toast خاص مع زر نسخ الرمز
+  function showTokenToast(token) {
+    const container = $("toastContainer");
+    const toast = document.createElement("div");
+    toast.className = "toast success";
+    toast.style.minWidth = "350px";
+    toast.innerHTML = `
+      <div style="margin-bottom: 8px; font-weight: bold;">🔑 الرمز الجديد:</div>
+      <div style="font-family: monospace; font-size: 12px; background: #0a0e27; padding: 8px; border-radius: 6px; margin-bottom: 8px; word-break: break-all; direction: ltr; text-align: left;">
+        ${token}
+      </div>
+      <button class="btn-primary btn-sm" style="width: 100%;" onclick="copyToClipboard('${token}')">
+        📋 نسخ الرمز
+      </button>
+    `;
+    container.appendChild(toast);
+
+    // يبقى 15 ثانية (لأنه مهم)
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => toast.remove(), 300);
+    }, 15000);
+  }
+
+  // ---------- 2) تعديل جهاز ----------
+  let currentEditToken = null;
+
+  function openEditModal(token) {
+    const device = state.devices.find((d) => d.token === token);
+    if (!device) return;
+
+    currentEditToken = token;
+    $("editLabel").value = device.label || "";
+    $("editLimit").value = device.monthly_limit;
+    $("editNotes").value = device.notes || "";
+    $("editDeviceModal").classList.add("active");
+  }
+
+  async function saveEdit() {
+    if (!currentEditToken) return;
+
+    const label = $("editLabel").value.trim();
+    const monthlyLimit = parseInt($("editLimit").value, 10);
+    const notes = $("editNotes").value.trim();
+
+    if (!monthlyLimit || monthlyLimit < 1) {
+      showToast("الحد الشهري يجب أن يكون رقماً أكبر من 0", "warning");
+      return;
+    }
+
+    const btn = $("saveEditBtn");
+    btn.disabled = true;
+    btn.textContent = "جاري الحفظ...";
+
+    try {
+      await apiCall(`/admin/devices/${currentEditToken}`, {
+        method: "PATCH",
+        body: JSON.stringify({ label, monthlyLimit, notes }),
+      });
+
+      $("editDeviceModal").classList.remove("active");
+      showToast("✅ تم التعديل", "success");
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message || "فشل التعديل", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "حفظ";
+      currentEditToken = null;
+    }
+  }
+
+  // ---------- 3) سجل الاستخدام ----------
+  async function openLogsModal(token) {
+    const device = state.devices.find((d) => d.token === token);
+    $("logsDeviceLabel").textContent = device
+      ? `${device.label || "بدون اسم"} — ${token.slice(0, 12)}...`
+      : token.slice(0, 12) + "...";
+
+    $("logsContainer").innerHTML = `
+      <div class="empty-state">جاري التحميل...</div>
+    `;
+    $("logsModal").classList.add("active");
+
+    try {
+      const data = await apiCall(`/admin/devices/${token}/logs?limit=50`);
+      const logs = data.logs || [];
+
+      if (logs.length === 0) {
+        $("logsContainer").innerHTML = `
+          <div class="empty-state">لا يوجد سجل استخدام لهذا الجهاز بعد</div>
+        `;
+        return;
+      }
+
+      $("logsContainer").innerHTML = `
+        <div style="max-height: 400px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border);">
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>التوكنات</th>
+                <th>معاينة السؤال</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map((log) => `
+                <tr>
+                  <td style="font-size: 12px;">${new Date(log.created_at).toLocaleString("ar-EG")}</td>
+                  <td>${log.tokens_used.toLocaleString("ar-EG")}</td>
+                  <td style="font-size: 12px; color: var(--text-dim);">
+                    ${escapeHtml(log.question_preview || "—")}
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      $("logsContainer").innerHTML = `
+        <div class="empty-state" style="color: var(--danger);">
+          فشل تحميل السجل: ${err.message}
+        </div>
+      `;
+    }
+  }
+
+  // ---------- 4) تعطيل / تفعيل ----------
+  async function toggleRevoke(token, isRevoked) {
+    const action = isRevoked ? "إعادة تفعيل" : "تعطيل";
+    if (!confirm(`هل تريد ${action} هذا الجهاز؟`)) return;
+
+    try {
+      const endpoint = isRevoked
+        ? `/admin/devices/${token}/unrevoke`
+        : `/admin/devices/${token}/revoke`;
+
+      await apiCall(endpoint, { method: "POST" });
+      showToast(`✅ تم ${action}`, "success");
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message || `فشل ${action}`, "error");
+    }
+  }
+
+  // ---------- 5) حذف ----------
+  let currentDeleteToken = null;
+
+  function confirmDelete(token) {
+    const device = state.devices.find((d) => d.token === token);
+    currentDeleteToken = token;
+
+    $("confirmMessage").innerHTML = `
+      هل أنت متأكد من حذف الجهاز نهائياً؟<br>
+      <strong style="color: var(--danger);">
+        ${escapeHtml(device?.label || token.slice(0, 20))}
+      </strong><br>
+      <small style="color: var(--text-dim);">لا يمكن التراجع عن هذه العملية.</small>
+    `;
+    $("confirmModal").classList.add("active");
+  }
+
+  async function performDelete() {
+    if (!currentDeleteToken) return;
+
+    const btn = $("confirmYesBtn");
+    btn.disabled = true;
+    btn.textContent = "جاري الحذف...";
+
+    try {
+      await apiCall(`/admin/devices/${currentDeleteToken}`, {
+        method: "DELETE",
+      });
+
+      $("confirmModal").classList.remove("active");
+      showToast("🗑️ تم الحذف نهائياً", "success");
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message || "فشل الحذف", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "نعم، تأكيد";
+      currentDeleteToken = null;
+    }
+  }
+
+  console.log("✅ Admin JS loaded (Part 2 + Actions)");
+</script>
 </script>
