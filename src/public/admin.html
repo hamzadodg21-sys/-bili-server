@@ -618,12 +618,305 @@
 <div id="toastContainer"></div>
 
 <!-- ============================================================
-     JavaScript سيُضاف هنا لاحقاً
+     JavaScript - الجزء 2 (Login + Load Data)
      ============================================================ -->
 <script>
-  // ✅ JavaScript سيُضاف في الجزء 2 و 3
-  console.log("Admin HTML loaded - Waiting for JS...");
-</script>
+  // ============================================================
+  //  1) الإعدادات العامة والحالة
+  // ============================================================
+  const API_BASE = "";  // نفس السيرفر (لا نحتاج URL كامل)
+  const STORAGE_KEY = "bili_admin_secret";
 
-</body>
-</html>
+  let state = {
+    adminSecret: null,
+    devices: [],
+    currentPage: 1,
+    currentLimit: 20,
+    currentSearch: "",
+    totalDevices: 0,
+  };
+
+  // ============================================================
+  //  2) اختصارات DOM
+  // ============================================================
+  const $ = (id) => document.getElementById(id);
+
+  const loginScreen = $("loginScreen");
+  const dashboardScreen = $("dashboardScreen");
+  const adminSecretInput = $("adminSecretInput");
+  const loginBtn = $("loginBtn");
+  const logoutBtn = $("logoutBtn");
+  const refreshBtn = $("refreshBtn");
+  const searchInput = $("searchInput");
+  const statTotal = $("statTotal");
+  const statActive = $("statActive");
+  const statRevoked = $("statRevoked");
+  const statTokens = $("statTokens");
+  const devicesTableBody = $("devicesTableBody");
+
+  // ============================================================
+  //  3) Toast Notifications
+  // ============================================================
+  function showToast(message, type = "success") {
+    const container = $("toastContainer");
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // ============================================================
+  //  4) API Helper
+  // ============================================================
+  async function apiCall(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": state.adminSecret,
+      ...(options.headers || {}),
+    };
+
+    try {
+      const response = await fetch(url, { ...options, headers });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = data.error || `خطأ ${response.status}`;
+        throw new Error(message);
+      }
+
+      return data;
+    } catch (err) {
+      console.error("API Error:", err);
+      throw err;
+    }
+  }
+
+  // ============================================================
+  //  5) تسجيل الدخول
+  // ============================================================
+  async function login() {
+    const secret = adminSecretInput.value.trim();
+    if (!secret) {
+      showToast("أدخل المفتاح أولاً", "warning");
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = "جاري التحقق...";
+
+    try {
+      // اختبار المفتاح عبر endpoint الإحصائيات
+      state.adminSecret = secret;
+      await apiCall("/admin/stats");
+
+      // نجح → احفظه
+      localStorage.setItem(STORAGE_KEY, secret);
+      showToast("✅ تم الدخول بنجاح", "success");
+
+      // انتقل للوحة
+      showDashboard();
+      await loadAllData();
+    } catch (err) {
+      state.adminSecret = null;
+      localStorage.removeItem(STORAGE_KEY);
+      showToast(err.message || "فشل الدخول", "error");
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = "دخول";
+    }
+  }
+
+  function logout() {
+    if (!confirm("هل تريد الخروج؟")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    state.adminSecret = null;
+    state.devices = [];
+    showLogin();
+    showToast("تم الخروج", "success");
+  }
+
+  function showLogin() {
+    loginScreen.style.display = "flex";
+    dashboardScreen.style.display = "none";
+    adminSecretInput.value = "";
+  }
+
+  function showDashboard() {
+    loginScreen.style.display = "none";
+    dashboardScreen.style.display = "block";
+  }
+
+  // ============================================================
+  //  6) تحميل البيانات
+  // ============================================================
+  async function loadAllData() {
+    await Promise.all([loadStats(), loadDevices()]);
+  }
+
+  async function loadStats() {
+    try {
+      const stats = await apiCall("/admin/stats");
+      statTotal.textContent = stats.totalDevices ?? "—";
+      statActive.textContent = stats.activeDevices ?? "—";
+      statRevoked.textContent = stats.revokedDevices ?? "—";
+      statTokens.textContent = (stats.monthlyTokensUsed ?? 0).toLocaleString("ar-EG");
+    } catch (err) {
+      showToast("فشل تحميل الإحصائيات: " + err.message, "error");
+    }
+  }
+
+  async function loadDevices() {
+    devicesTableBody.innerHTML = `
+      <tr><td colspan="6" class="empty-state">جاري التحميل...</td></tr>
+    `;
+
+    try {
+      const params = new URLSearchParams({
+        page: state.currentPage,
+        limit: state.currentLimit,
+      });
+      if (state.currentSearch) {
+        params.append("search", state.currentSearch);
+      }
+
+      const data = await apiCall(`/admin/devices?${params}`);
+      state.devices = data.devices || [];
+      state.totalDevices = data.pagination?.total || 0;
+
+      renderDevices();
+    } catch (err) {
+      devicesTableBody.innerHTML = `
+        <tr><td colspan="6" class="empty-state" style="color: var(--danger);">
+          فشل تحميل الأجهزة: ${err.message}
+        </td></tr>
+      `;
+    }
+  }
+
+  // ============================================================
+  //  7) عرض جدول الأجهزة
+  // ============================================================
+  function renderDevices() {
+    if (state.devices.length === 0) {
+      devicesTableBody.innerHTML = `
+        <tr><td colspan="6" class="empty-state">
+          لا يوجد أجهزة${state.currentSearch ? " مطابقة للبحث" : ""}
+        </td></tr>
+      `;
+      return;
+    }
+
+    devicesTableBody.innerHTML = state.devices.map((device) => {
+      const status = device.revoked
+        ? `<span class="status-badge status-revoked">معطّل</span>`
+        : `<span class="status-badge status-active">نشط</span>`;
+
+      const createdAt = new Date(device.created_at).toLocaleDateString("ar-EG");
+      const tokenShort = device.token.length > 20
+        ? device.token.slice(0, 20) + "..."
+        : device.token;
+
+      return `
+        <tr>
+          <td class="token-cell" title="${device.token}">${tokenShort}</td>
+          <td>${escapeHtml(device.label || "—")}</td>
+          <td>${device.monthly_limit.toLocaleString("ar-EG")}</td>
+          <td>${status}</td>
+          <td>${createdAt}</td>
+          <td class="actions-cell">
+            <button class="btn-ghost btn-sm" data-action="logs" data-token="${device.token}">
+              📜
+            </button>
+            <button class="btn-ghost btn-sm" data-action="edit" data-token="${device.token}">
+              ✏️
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  // حماية من XSS في label
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ============================================================
+  //  8) البحث (مع debounce)
+  // ============================================================
+  let searchTimer = null;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.currentSearch = searchInput.value.trim();
+      state.currentPage = 1;
+      loadDevices();
+    }, 400);
+  });
+
+  // ============================================================
+  //  9) إغلاق النوافذ المنبثقة
+  // ============================================================
+  document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modalId = btn.getAttribute("data-close-modal");
+      $(modalId)?.classList.remove("active");
+    });
+  });
+
+  // إغلاق عند النقر خارج النافذة
+  document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove("active");
+      }
+    });
+  });
+
+  // ============================================================
+  //  10) ربط الأزرار العامة
+  // ============================================================
+  loginBtn.addEventListener("click", login);
+  adminSecretInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") login();
+  });
+
+  logoutBtn.addEventListener("click", logout);
+  refreshBtn.addEventListener("click", async () => {
+    showToast("جاري التحديث...", "success");
+    await loadAllData();
+    showToast("✅ تم التحديث", "success");
+  });
+
+  // ============================================================
+  //  11) عند فتح الصفحة - جلسة محفوظة؟
+  // ============================================================
+  (async function init() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      state.adminSecret = saved;
+      try {
+        // اختبار سريع
+        await apiCall("/admin/stats");
+        showDashboard();
+        await loadAllData();
+        return;
+      } catch (_) {
+        // المفتاح لم يعد صالحاً
+        localStorage.removeItem(STORAGE_KEY);
+        state.adminSecret = null;
+      }
+    }
+    showLogin();
+  })();
+
+  console.log("✅ Admin JS loaded (Part 2)");
+</script>
