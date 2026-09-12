@@ -802,7 +802,8 @@
   // ============================================================
   //  7) عرض جدول الأجهزة
   // ============================================================
-  function renderDevices() {
+
+      function renderDevices() {
     if (state.devices.length === 0) {
       devicesTableBody.innerHTML = `
         <tr><td colspan="6" class="empty-state">
@@ -822,6 +823,11 @@
         ? device.token.slice(0, 20) + "..."
         : device.token;
 
+      // ✅ زر تعطيل/تفعيل حسب الحالة
+      const toggleBtn = device.revoked
+        ? `<button class="btn-ghost btn-sm" data-action="unrevoke" data-token="${device.token}" title="إعادة تفعيل">✅</button>`
+        : `<button class="btn-ghost btn-sm" data-action="revoke" data-token="${device.token}" title="تعطيل">⛔</button>`;
+
       return `
         <tr>
           <td class="token-cell" title="${device.token}">${tokenShort}</td>
@@ -830,11 +836,15 @@
           <td>${status}</td>
           <td>${createdAt}</td>
           <td class="actions-cell">
-            <button class="btn-ghost btn-sm" data-action="logs" data-token="${device.token}">
+            <button class="btn-ghost btn-sm" data-action="logs" data-token="${device.token}" title="سجل الاستخدام">
               📜
             </button>
-            <button class="btn-ghost btn-sm" data-action="edit" data-token="${device.token}">
+            <button class="btn-ghost btn-sm" data-action="edit" data-token="${device.token}" title="تعديل">
               ✏️
+            </button>
+            ${toggleBtn}
+            <button class="btn-ghost btn-sm" data-action="delete" data-token="${device.token}" title="حذف" style="color: var(--danger);">
+              🗑️
             </button>
           </td>
         </tr>
