@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bili Admin - لوحة الإدارة</title>
+<style>
+  /* ============================================================
+     المتغيرات العامة
+     ============================================================ */
+  :root {
+    --bg: #0a0e27;
+    --card: #1a1f3a;
+    --card-hover: #232847;
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --text: #ffffff;
+    --text-dim: #a0a4b8;
+    --border: #2a2f4a;
+    --radius: 12px;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Tahoma, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    direction: rtl;
+  }
+
+  /* ============================================================
+     شاشة تسجيل الدخول
+     ============================================================ */
+  #loginScreen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .login-card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  .login-card h1 {
+    color: var(--primary);
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .login-card p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+
+  /* ============================================================
+     الحقول والأزرار العامة
+     ============================================================ */
+  input, textarea, select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    width: 100%;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  .btn-danger {
+    background: var(--danger);
+    color: white;
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+
+  .btn-warning {
+    background: var(--warning);
+    color: #000;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    background: var(--card-hover);
+  }
+
+  /* ============================================================
+     الشاشة الرئيسية (Dashboard)
+     ============================================================ */
+  #dashboardScreen {
+    display: none;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar h1 {
+    color: var(--primary);
+    font-size: 24px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  /* ============================================================
+     بطاقات الإحصائيات
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    padding: 20px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .stat-card .label {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: bold;
+  }
+
+  .stat-card.primary .value { color: var(--primary); }
+  .stat-card.success .value { color: var(--success); }
+  .stat-card.danger .value { color: var(--danger); }
+  .stat-card.warning .value { color: var(--warning); }
+
+  /* ============================================================
+     شريط الأدوات (Toolbar)
+     ============================================================ */
+  .toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  /* ============================================================
+     الجدول
+     ============================================================ */
+  .table-container {
+    background: var(--card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead {
+    background: var(--card-hover);
+  }
+
+  th {
+    padding: 14px 16px;
+    text-align: right;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: bold;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  tbody tr:hover {
+    background: var(--card-hover);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .token-cell {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: ltr;
+    text-align: left;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .status-active {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+  }
+
+  .status-revoked {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 6px;
+  }
+
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+
+  /* ============================================================
+     النوافذ المنبثقة (Modals)
+     ============================================================ */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+  }
+
+  .modal h2 {
+    color: var(--primary);
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-start;
+    margin-top: 20px;
+  }
+
+  /* ============================================================
+     Toast Notifications
+     ============================================================ */
+  #toastContainer {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toast {
+    background: var(--card);
+    padding: 14px 20px;
+    border-radius: 8px;
+    border-right: 4px solid var(--primary);
+    box-shadow: var(--shadow);
+    min-width: 250px;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .toast.success { border-right-color: var(--success); }
+  .toast.error { border-right-color: var(--danger); }
+  .toast.warning { border-right-color: var(--warning); }
+
+  @keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* ============================================================
+     Responsive
+     ============================================================ */
+  @media (max-width: 768px) {
+    .topbar {
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    table {
+      font-size: 12px;
+    }
+    th, td {
+      padding: 10px 8px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     شاشة تسجيل الدخول
+     ============================================================ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>🔐 Bili Admin</h1>
+    <p>لوحة إدارة المستخدمين</p>
+
+    <div class="form-group">
+      <input
+        type="password"
+        id="adminSecretInput"
+        placeholder="أدخل ADMIN_SECRET"
+        autocomplete="off"
+      >
+    </div>
+
+    <button class="btn-primary" id="loginBtn">
+      دخول
+    </button>
+
+    <p style="margin-top: 16px; font-size: 12px; color: var(--text-dim);">
+      🔒 المفتاح يُحفظ محلياً في المتصفح فقط
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================
+     الشاشة الرئيسية (Dashboard)
+     ============================================================ -->
+<div id="dashboardScreen">
+
+  <!-- الشريط العلوي -->
+  <div class="topbar">
+    <h1>📊 Bili Admin</h1>
+    <div class="topbar-actions">
+      <button class="btn-ghost btn-sm" id="refreshBtn">🔄 تحديث</button>
+      <button class="btn-ghost btn-sm" id="logoutBtn">🚪 خروج</button>
+    </div>
+  </div>
+
+  <!-- بطاقات الإحصائيات -->
+  <div class="stats-grid">
+    <div class="stat-card primary">
+      <div class="label">إجمالي الأجهزة</div>
+      <div class="value" id="statTotal">—</div>
+    </div>
+    <div class="stat-card success">
+      <div class="label">الأجهزة النشطة</div>
+      <div class="value" id="statActive">—</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="label">الأجهزة المعطلة</div>
+      <div class="value" id="statRevoked">—</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="label">استهلاك الشهر (توكن)</div>
+      <div class="value" id="statTokens">—</div>
+    </div>
+  </div>
+
+  <!-- شريط الأدوات -->
+  <div class="toolbar">
+    <button class="btn-primary" id="newDeviceBtn" style="width: auto;">
+      ➕ توليد رمز جديد
+    </button>
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="🔍 ابحث بـ Token أو Label..."
+    >
+  </div>
+
+  <!-- جدول الأجهزة -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Label</th>
+          <th>الحد الشهري</th>
+          <th>الحالة</th>
+          <th>تاريخ الإنشاء</th>
+          <th>الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="devicesTableBody">
+        <tr>
+          <td colspan="6" class="empty-state">
+            جاري التحميل...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     Modal: توليد جهاز جديد
+     ============================================================ -->
+<div class="modal-overlay" id="newDeviceModal">
+  <div class="modal">
+    <h2>➕ توليد رمز جديد</h2>
+
+    <div class="form-group">
+      <label>اسم وصفي (Label)</label>
+      <input type="text" id="newLabel" placeholder="مثال: أحمد - وهران">
+    </div>
+
+    <div class="form-group">
+      <label>الحد الشهري (توكن)</label>
+      <input type="number" id="newLimit" value="1000" min="1">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-primary" id="createDeviceConfirm" style="width: auto;">
+        إنشاء
+      </button>
+      <button class="btn-ghost" data-close-modal="newDeviceModal">
+        إلغاء
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Modal: تعديل جهاز
+     ============================================================ -->
+<div class="modal-overlay" id="editDeviceModal">
+  <div class="modal">
+    <h2>✏️ تعديل الجهاز</h2>
+
+    <div class="form-group">
+      <label>Label</label>
+      <input type="text" id="editLabel">
+    </div>
+
+    <div class="form-group">
+      <label>الحد الشهري (توكن)</label>
+      <input type="number" id="editLimit" min="1">
+    </div>
+
+    <div class="form-group">
+      <label>ملاحظات</label>
+      <textarea id="editNotes" placeholder="ملاحظات داخلية..."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-primary" id="saveEditBtn" style="width: auto;">
+        حفظ
+      </button>
+      <button class="btn-ghost" data-close-modal="editDeviceModal">
+        إلغاء
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Modal: تفاصيل + سجل الاستخدام
+     ============================================================ -->
+<div class="modal-overlay" id="logsModal">
+  <div class="modal" style="max-width: 700px;">
+    <h2>📜 سجل الاستخدام</h2>
+    <p id="logsDeviceLabel" style="color: var(--text-dim); margin-bottom: 16px;"></p>
+    <div id="logsContainer">
+      جاري التحميل...
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" data-close-modal="logsModal">
+        إغلاق
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Modal: تأكيد الحذف
+     ============================================================ -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h2>⚠️ تأكيد</h2>
+    <p id="confirmMessage" style="margin-bottom: 20px;"></p>
+    <div class="modal-actions">
+      <button class="btn-danger" id="confirmYesBtn" style="width: auto;">
+        نعم، تأكيد
+      </button>
+      <button class="btn-ghost" data-close-modal="confirmModal">
+        إلغاء
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Toast Container
+     ============================================================ -->
+<div id="toastContainer"></div>
+
+<!-- ============================================================
+     JavaScript سيُضاف هنا لاحقاً
+     ============================================================ -->
+<script>
+  // ✅ JavaScript سيُضاف في الجزء 2 و 3
+  console.log("Admin HTML loaded - Waiting for JS...");
+</script>
+
+</body>
+</html>
